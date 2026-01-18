@@ -216,21 +216,33 @@ struct TodayView: View {
 
     private func cardBackground(colorHex: String) -> some View {
         let c = Color(hex: colorHex)
-        return RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .fill(AppPalette.card)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(c.opacity(0.10))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(c.opacity(0.55), lineWidth: 1)
-            )
+        return ZStack {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(AppPalette.card)
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(habitCardGradient(base: c))
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(c.opacity(0.55), lineWidth: 1)
+        )
     }
 
     // MARK: - Helpers
 
     private var isEditing: Bool { editMode?.wrappedValue.isEditing == true }
+
+    private func habitCardGradient(base: Color) -> LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: base.opacity(0.18), location: 0.0),
+                .init(color: base.opacity(0.08), location: 0.55),
+                .init(color: Color.black.opacity(0.0), location: 1.0)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
 
     private func startOfDay(_ d: Date) -> Date {
         Calendar.current.startOfDay(for: d)
@@ -244,4 +256,3 @@ struct TodayView: View {
         }
     }
 }
-
