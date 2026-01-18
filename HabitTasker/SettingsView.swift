@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import UserNotifications
 
 struct SettingsView: View {
     @EnvironmentObject private var store: HabitStore
@@ -15,12 +16,21 @@ struct SettingsView: View {
             Form {
                 Section("Напоминания") {
                     Toggle("Включить напоминания", isOn: $notificationsSettings.enableReminders)
+                        .onChange(of: notificationsSettings.enableReminders) { _, isEnabled in
+                            handleReminderToggleChange(isEnabled)
+                        }
                     DatePicker(
                         "Время напоминаний",
                         selection: $notificationsSettings.reminderTime,
                         displayedComponents: .hourAndMinute
                     )
-                    Text("Пуши добавим в следующей версии. Сейчас это настройка-черновик.")
+                    .onChange(of: notificationsSettings.reminderTime) { _, newTime in
+                        handleReminderTimeChange(newTime)
+                    }
+                    Button("Тест уведомления (через 5 сек)") {
+                        handleTestReminder()
+                    }
+                    Text("Ежедневное напоминание придет в выбранное время.")
                         .font(.footnote)
                         .foregroundStyle(AppPalette.textSecondary)
                 }
@@ -64,7 +74,7 @@ struct SettingsView: View {
             handleImport(result)
         }
         .alert(item: $alert) { alert in
-            alert.makeAlert(store: store)
+            alert.makeAlert(store: store, notificationManager: NotificationManager.shared)
         }
     }
 
@@ -95,12 +105,67 @@ struct SettingsView: View {
             alert = .importError(error.localizedDescription)
         }
     }
+
+    private func handleReminderToggleChange(_ isEnabled: Bool) {
+        Task {
+            if isEnabled {
+                let granted = await NotificationManager.shared.requestAuthorization()
+                if granted {
+                    NotificationManager.shared.scheduleDailyReminder(at: notificationsSettings.reminderTime)
+                } else {
+                    notificationsSettings.enableReminders = false
+                    alert = .notificationsPermission
+                }
+            } else {
+                NotificationManager.shared.cancelDailyReminder()
+            }
+        }
+    }
+
+    private func handleReminderTimeChange(_ newTime: Date) {
+        guard notificationsSettings.enableReminders else { return }
+        Task {
+            let status = await NotificationManager.shared.authorizationStatus()
+            if isAuthorized(status) {
+                NotificationManager.shared.scheduleDailyReminder(at: newTime)
+            } else {
+                notificationsSettings.enableReminders = false
+                alert = .notificationsPermission
+            }
+        }
+    }
+
+    private func handleTestReminder() {
+        Task {
+            let status = await NotificationManager.shared.authorizationStatus()
+            if isAuthorized(status) {
+                NotificationManager.shared.scheduleTestReminder()
+            } else {
+                if notificationsSettings.enableReminders {
+                    notificationsSettings.enableReminders = false
+                }
+                alert = .notificationsPermission
+            }
+        }
+    }
+
+    private func isAuthorized(_ status: UNAuthorizationStatus) -> Bool {
+        switch status {
+        case .authorized, .provisional, .ephemeral:
+            return true
+        case .denied, .notDetermined:
+            return false
+        @unknown default:
+            return false
+        }
+    }
 }
 
 private enum SettingsAlert: Identifiable {
     case reset
     case exportError(String)
     case importError(String)
+    case notificationsPermission
 
     var id: String {
         switch self {
@@ -110,10 +175,12 @@ private enum SettingsAlert: Identifiable {
             return "exportError"
         case .importError:
             return "importError"
+        case .notificationsPermission:
+            return "notificationsPermission"
         }
     }
 
-    func makeAlert(store: HabitStore) -> Alert {
+    func makeAlert(store: HabitStore, notificationManager: NotificationManager) -> Alert {
         switch self {
         case .reset:
             return Alert(
@@ -135,6 +202,15 @@ private enum SettingsAlert: Identifiable {
                 title: Text("Не удалось импортировать"),
                 message: Text(message),
                 dismissButton: .default(Text("Ок"))
+            )
+        case .notificationsPermission:
+            return Alert(
+                title: Text("Нет доступа к уведомлениям"),
+                message: Text("Разрешите уведомления в настройках, чтобы напоминания работали."),
+                primaryButton: .default(Text("Открыть Настройки")) {
+                    notificationManager.openAppSettings()
+                },
+                secondaryButton: .cancel(Text("Отмена"))
             )
         }
     }
