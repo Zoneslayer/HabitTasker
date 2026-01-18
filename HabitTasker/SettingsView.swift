@@ -46,7 +46,7 @@ struct SettingsView: View {
                         Text(appVersion)
                             .foregroundStyle(AppPalette.textSecondary)
                     }
-                    Text("HabitTasker v0.2.2")
+                    Text("HabitTasker v0.2.2.1")
                         .foregroundStyle(AppPalette.textSecondary)
                 }
                 .listRowBackground(AppPalette.card)
