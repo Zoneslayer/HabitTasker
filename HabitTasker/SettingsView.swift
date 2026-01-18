@@ -56,8 +56,6 @@ struct SettingsView: View {
                         Text(appVersion)
                             .foregroundStyle(AppPalette.textSecondary)
                     }
-                    Text("HabitTasker v0.2.2.1")
-                        .foregroundStyle(AppPalette.textSecondary)
                 }
                 .listRowBackground(AppPalette.card)
             }
@@ -79,8 +77,10 @@ struct SettingsView: View {
     }
 
     private var appVersion: String {
-        let shortVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
-        let buildVersion = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
+        let info = Bundle.main.infoDictionary
+        let shortVersion = info?["CFBundleShortVersionString"] as? String
+        let buildVersion = info?["CFBundleVersion"] as? String
+        guard let shortVersion, let buildVersion else { return "—" }
         return "\(shortVersion) (\(buildVersion))"
     }
 
