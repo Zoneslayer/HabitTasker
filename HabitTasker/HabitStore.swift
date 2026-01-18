@@ -5,19 +5,17 @@ import Combine
 final class HabitStore: ObservableObject {
 
     @Published var habits: [Habit] = [] {
-        didSet { persist() }
+        didSet { scheduleSave() }
     }
 
     @Published var selectedDate: Date = Calendar.current.startOfDay(for: Date())
 
-    private let storageKey = "HabitTasker.habits.v1"
+    private let persistence = PersistenceManager()
+    private var saveTask: Task<Void, Never>?
+    private let saveDelay: UInt64 = 800_000_000
 
     init() {
-        load()
-        if habits.isEmpty {
-            seedHabits()
-            persist()
-        }
+        loadFromDisk()
     }
 
     // MARK: - Day state
@@ -138,25 +136,57 @@ final class HabitStore: ObservableObject {
 
     // MARK: - Persistence
 
-    private func persist() {
+    func exportJSON() throws -> URL {
+        let snapshot = AppSnapshot(schemaVersion: PersistenceManager.schemaVersion, habits: habits)
+        let data = try persistence.encode(snapshot: snapshot)
+        let filename = "HabitTasker-\(DateUtils.dayKey(Date())).json"
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(filename)
+        try data.write(to: url, options: [.atomic])
+        return url
+    }
+
+    func importJSON(from url: URL) throws {
+        let data = try Data(contentsOf: url)
+        let snapshot = try persistence.decode(data: data)
+        habits = snapshot.habits
+        persistNow(habits: snapshot.habits)
+    }
+
+    func resetData() {
+        habits = []
+        persistNow(habits: [])
+    }
+
+    private func loadFromDisk() {
         do {
-            let data = try JSONEncoder().encode(habits)
-            UserDefaults.standard.set(data, forKey: storageKey)
+            if let snapshot = try persistence.load() {
+                habits = snapshot.habits
+                return
+            }
+            seedHabits()
+            persistNow(habits: habits)
         } catch {
-            // В MVP просто игнорируем ошибки кодирования.
+            print("Failed to load habits data: \(error)")
+            habits = []
         }
     }
 
-    private func load() {
-        guard let data = UserDefaults.standard.data(forKey: storageKey) else {
-            habits = []
-            return
+    private func scheduleSave() {
+        saveTask?.cancel()
+        let snapshotHabits = habits
+        let delay = saveDelay
+        saveTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: delay)
+            await self?.persistNow(habits: snapshotHabits)
         }
+    }
 
+    private func persistNow(habits: [Habit]) {
+        let snapshot = AppSnapshot(schemaVersion: PersistenceManager.schemaVersion, habits: habits)
         do {
-            habits = try JSONDecoder().decode([Habit].self, from: data)
+            try persistence.save(snapshot: snapshot)
         } catch {
-            habits = []
+            print("Failed to save habits data: \(error)")
         }
     }
 

@@ -11,9 +11,11 @@ struct RootView: View {
 
             StatsView()
                 .tabItem { Label("Статистика", systemImage: "chart.bar.fill") }
+
+            SettingsView()
+                .tabItem { Label("Настройки", systemImage: "gearshape") }
         }
         .tint(Color(hex: "4DA3FF"))
         .background(AppPalette.background)
     }
 }
-
