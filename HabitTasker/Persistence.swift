@@ -41,7 +41,7 @@ struct PersistenceManager {
     func save(snapshot: AppSnapshot) throws {
         let data = try encode(snapshot: snapshot)
         let directoryURL = fileURL.deletingLastPathComponent()
-        try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true, attributes: nil)
         try data.write(to: fileURL, options: [.atomic])
     }
 
