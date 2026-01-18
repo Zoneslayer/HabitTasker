@@ -6,6 +6,8 @@ struct HabitsView: View {
 
     @State private var presentAdd = false
     @State private var editHabit: Habit? = nil
+    @State private var habitPendingDeletion: Habit? = nil
+    @State private var showDeleteConfirmation = false
 
     private var isEditing: Bool { editMode?.wrappedValue.isEditing == true }
 
@@ -34,9 +36,10 @@ struct HabitsView: View {
                                 .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(AppPalette.background)
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                                     Button(role: .destructive) {
-                                        store.deleteHabit(h.id)
+                                        habitPendingDeletion = h
+                                        showDeleteConfirmation = true
                                     } label: {
                                         Label("Удалить", systemImage: "trash")
                                     }
@@ -44,7 +47,8 @@ struct HabitsView: View {
                                 // На всякий случай — если хочешь альтернативу свайпу:
                                 .contextMenu {
                                     Button(role: .destructive) {
-                                        store.deleteHabit(h.id)
+                                        habitPendingDeletion = h
+                                        showDeleteConfirmation = true
                                     } label: {
                                         Label("Удалить", systemImage: "trash")
                                     }
@@ -74,6 +78,17 @@ struct HabitsView: View {
             .sheet(item: $editHabit) { h in
                 AddEditHabitView(mode: .edit(h))
                     .environmentObject(store)
+            }
+            .alert("Удалить привычку?", isPresented: $showDeleteConfirmation, presenting: habitPendingDeletion) { habit in
+                Button("Удалить", role: .destructive) {
+                    store.deleteHabit(habit.id)
+                    habitPendingDeletion = nil
+                }
+                Button("Отмена", role: .cancel) {
+                    habitPendingDeletion = nil
+                }
+            } message: { habit in
+                Text("Привычка «\(habit.name)» будет удалена из «Сегодня» и статистики.")
             }
         }
     }
@@ -157,4 +172,3 @@ struct HabitsView: View {
         }
     }
 }
-
